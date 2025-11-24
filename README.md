@@ -3,6 +3,11 @@ Multi-Agent Orchestrator
 This project simulates a simple multi-agent workflow that processes a user query through distinct steps: researching a topic, analyzing the information, identifying the user’s intent, and generating a final response.
 It is built with Node.js, Express, and a plain HTML/CSS/JavaScript frontend.
 
+Live Demo:
+
+https://multi-agent-ai-1.onrender.com/
+
+
 Overview
 
 The system sends the user’s query through three backend agents:
