@@ -1,0 +1,22 @@
+{
+  "name": "multi-agent-orchestrator",
+  "version": "1.0.0",
+  "description": "A multi-agent AI system simulation using Node.js and the Wikipedia API.",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "multi-agent",
+    "wikipedia",
+    "portfolio"
+  ],
+  "author": "Harshit Uppala",
+  "license": "ISC",
+  "dependencies": {
+    "axios": "^1.6.2",
+    "express": "^4.18.2"
+  }
+}

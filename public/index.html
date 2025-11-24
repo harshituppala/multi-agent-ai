@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Multi-Agent Orchestrator | Harshit Uppala Portfolio</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol"; }
+    </style>
+</head>
+<body>
+<header class="glass-card">
+    <h1>🤖 Multi-Agent Orchestrator</h1>
+    <p>Research, analysis, and task agents collaborate to answer your question using the Wikipedia public API.</p>
+</header>
+
+<main class="container">
+    <section class="controls-card glass-card">
+        <h2>Query Input</h2>
+        <div class="input-group">
+            <textarea id="query-input" rows="4" placeholder="e.g., 'Explain Kubernetes for beginners', 'What is serverless computing?', 'Compare React vs Angular'"></textarea>
+            <div class="control-row">
+                <button id="run-button" class="primary-button" disabled>
+                    <span id="run-text">Run Agents</span>
+                    <div id="loading-spinner" class="spinner hidden"></div>
+                </button>
+                <div id="error-message" class="error-message" role="alert" aria-live="assertive"></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="timeline-card glass-card">
+        <h2>Agent Pipeline</h2>
+        <div class="timeline" id="agent-timeline">
+            <div class="timeline-item" id="step-research">
+                <div class="step-badge">1</div>
+                <div class="step-content">
+                    <div class="step-title">Research Agent</div>
+                    <div class="step-description">Waiting for a question...</div>
+                </div>
+            </div>
+
+            <div class="timeline-item" id="step-analysis">
+                <div class="step-badge">2</div>
+                <div class="step-content">
+                    <div class="step-title">Analysis Agent</div>
+                    <div class="step-description">Waiting for a question...</div>
+                </div>
+            </div>
+
+            <div class="timeline-item" id="step-task">
+                <div class="step-badge">3</div>
+                <div class="step-content">
+                    <div class="step-title">Task Agent</div>
+                    <div class="step-description">Waiting for a question...</div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="final-answer-card glass-card full-width">
+        <h2>Final Answer</h2>
+        <div id="answer-container" class="answer-container">
+            <div id="initial-message">
+                Enter a query above and click "Run Agents" to see the output.
+            </div>
+        </div>
+    </section>
+</main>
+
+<script>
+    // --- DOM Elements ---
+    const queryInput = document.getElementById('query-input');
+    const runButton = document.getElementById('run-button');
+    const runText = document.getElementById('run-text');
+    const loadingSpinner = document.getElementById('loading-spinner');
+    const errorMessage = document.getElementById('error-message');
+    const answerContainer = document.getElementById('answer-container');
+    const timeline = document.getElementById('agent-timeline');
+
+    const stepResearch = document.getElementById('step-research');
+    const stepAnalysis = document.getElementById('step-analysis');
+    const stepTask = document.getElementById('step-task');
+
+    // --- State Management ---
+    const API_URL = '/api/query';
+
+    function updateUIState(state) {
+        // state: 'idle', 'loading', 'error', 'success'
+        runButton.disabled = state === 'loading' || queryInput.value.trim() === '';
+        runButton.classList.toggle('loading', state === 'loading');
+        loadingSpinner.classList.toggle('hidden', state !== 'loading');
+        runText.textContent = state === 'loading' ? 'Agents are collaborating...' : 'Run Agents';
+        errorMessage.textContent = '';
+
+        if (state !== 'success') {
+            answerContainer.innerHTML = state === 'loading'
+                ? '<div class="loading-message">Agents are collaborating... Please wait.</div>'
+                : '<div id="initial-message">Enter a query above and click "Run Agents" to see the output.</div>';
+        }
+
+        if (state === 'idle' || state === 'error') {
+            resetTimeline();
+        }
+    }
+
+    function resetTimeline() {
+        // Reset all steps to initial/waiting state
+        [stepResearch, stepAnalysis, stepTask].forEach(el => {
+            el.classList.remove('active', 'completed', 'error');
+            el.querySelector('.step-description').textContent = 'Waiting for a question...';
+        });
+    }
+
+    function updateTimelineStep(stepId, status, message) {
+        const stepEl = document.getElementById(`step-${stepId}`);
+        if (!stepEl) return;
+
+        stepEl.classList.remove('active', 'completed', 'error');
+        stepEl.querySelector('.step-description').textContent = message;
+
+        if (status === 'active') {
+            stepEl.classList.add('active');
+        } else if (status === 'completed') {
+            stepEl.classList.add('completed');
+        } else if (status === 'error') {
+            stepEl.classList.add('error');
+        }
+    }
+
+    /**
+     * Simple function to convert basic Markdown (like * for bullet, ** for bold, ## for h2)
+     * into stylized HTML for display. A real library is usually better, but this suffices for the scope.
+     */
+    function formatMarkdown(markdown) {
+        if (!markdown) return '';
+        let html = markdown;
+
+        // Headers (H2)
+        html = html.replace(/^##\s*(.*)$/gm, '<h2>$1</h2>');
+
+        // Bold
+        html = html.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+
+        // Unordered Lists
+        html = html.replace(/^\*\s*(.*)$/gm, '<li>$1</li>');
+        html = html.replace(/^(<li>.*<\/li>(\s*))+/gm, '<ul>$&</ul>');
+
+        // Horizontal Rule
+        html = html.replace(/---\n/g, '<hr>');
+
+        // Links (simple [Text](URL) regex)
+        html = html.replace(/\[(.*?)\]\((.*?)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>');
+
+        // Line breaks
+        html = html.replace(/\n\n/g, '<p>').replace(/\n/g, '<br>');
+        html = html.replace(/<p><ul>/g, '<ul>').replace(/<\/ul><p>/g, '</ul>'); // Clean up list surrounding
+        html = html.replace(/<p><h2>/g, '<h2>').replace(/<\/h2><p>/g, '</h2>');
+
+        return html.trim();
+    }
+
+    // --- Core Logic ---
+    async function runAgents() {
+        const query = queryInput.value.trim();
+        if (!query) return;
+
+        updateUIState('loading');
+        errorMessage.textContent = '';
+
+        // Initial timeline updates
+        updateTimelineStep('research', 'active', `Searching for topic for: "${query}"...`);
+
+        try {
+            const response = await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ query })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok || data.error) {
+                throw new Error(data.message || `API call failed with status ${response.status}.`);
+            }
+
+            // --- Timeline Updates based on Agent Results ---
+
+            // 1. Research Result
+            if (data.research.ok) {
+                updateTimelineStep('research', 'completed', `Fetched topic: ${data.research.topic} from Wikipedia.`);
+            } else {
+                updateTimelineStep('research', 'error', `Failed: ${data.research.error}.`);
+                // If research fails, the entire pipeline is essentially an error state
+                answerContainer.innerHTML = `<div class="error-result-message">${data.finalAnswer}</div>`;
+                updateUIState('error');
+                return;
+            }
+
+            // 2. Analysis Result
+            updateTimelineStep('analysis', 'active', 'Analyzing content...');
+            const difficulty = data.analysis.difficulty.charAt(0).toUpperCase() + data.analysis.difficulty.slice(1);
+            updateTimelineStep('analysis', 'completed', `Extracted ${data.analysis.keyPoints.length} key points. (Difficulty: ${difficulty}).`);
+
+            // 3. Task Result
+            updateTimelineStep('task', 'active', 'Determining final presentation format...');
+            updateTimelineStep('task', 'completed', `Chose presentation mode: ${data.task.mode}.`);
+
+            // Final success state
+            answerContainer.innerHTML = `<div class="final-result">${formatMarkdown(data.finalAnswer)}</div>`;
+            updateUIState('success');
+
+        } catch (error) {
+            console.error('Frontend Error:', error);
+            // General error handling
+            errorMessage.textContent = `🚨 Orchestration Error: ${error.message}. Check console for details.`;
+            updateUIState('error');
+        }
+    }
+
+    // --- Event Listeners ---
+    queryInput.addEventListener('input', () => {
+        // Enable button only if there's non-empty text
+        runButton.disabled = queryInput.value.trim() === '';
+        errorMessage.textContent = ''; // Clear previous error on new input
+        // Update UI state to idle if not loading
+        if (loadingSpinner.classList.contains('hidden')) {
+            updateUIState('idle');
+        }
+    });
+
+    runButton.addEventListener('click', runAgents);
+
+    queryInput.addEventListener('keydown', (e) => {
+        // Check for Enter key without Shift
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault(); // Prevent default new line behavior
+            if (!runButton.disabled) {
+                runAgents();
+            }
+        }
+    });
+
+    // Initial state setup
+    document.addEventListener('DOMContentLoaded', () => {
+        updateUIState('idle');
+    });
+
+</script>
+</body>
+</html>
